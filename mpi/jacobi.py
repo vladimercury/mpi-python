@@ -6,6 +6,7 @@ from math import log10
 
 ROOT = "../data/"
 STAT = "../stat/"
+RES = "../res/"
 
 
 def buffer(buffer_size):
@@ -73,10 +74,8 @@ local_x = buffer(chunk)
 if rank != 0:
     est = buffer(n)
 
-# broadcast estimation
 comm.Bcast(est, root=0)
 
-# give part of A and B to each process
 comm.Scatter(a, local_a, root=0)
 comm.Scatter(b, local_b, root=0)
 
@@ -84,11 +83,9 @@ if rank == 0:
     print("Solving with", pool_size, "workers... ", end="")
     start = MPI.Wtime()
 
-# buffer for max norm
-max_norm = buffer(1)
+max_norm = to_buffer(eps + 1)
 
-while True:
-    # count estimation for step
+while np.asscalar(max_norm) >= eps / n:
     for i in range(chunk):
         local_x[i] = local_b[i]
         for j in range(n):
@@ -96,26 +93,46 @@ while True:
                 local_x[i] -= local_a[i * n + j] * est[j]
         local_x[i] /= local_a[rank * chunk + i + i * n]
 
-    # count max norm for worker
     norm = np.absolute(est[rank * chunk:rank * chunk + chunk] - local_x).max()
     norm = to_buffer(norm)
 
-    # get max norm from all workers
     comm.Reduce(norm, max_norm, op=MPI.MAX, root=0)
 
     comm.Bcast(max_norm, root=0)
 
-    # collect all estimations into single array
     comm.Allgather(local_x, est)
-    if np.asscalar(max_norm) <= eps:
-        break
+
+    # if rank == 0:
+    #     check = np.zeros(n)
+    #     for i in range(n):
+    #         check[i] = a[i*n:i*n+n].dot(est)
+    #     diff = np.absolute(check - b)
+    #     max_norm = diff.max()
+    #
+    # comm.Bcast(max_norm, root=0)
 
 comm.Barrier()
 if rank == 0:
     end = MPI.Wtime()
     ms = (end - start) * 1000
-    print("done in %.2f" % (ms), "ms")
+    print("done in %.2f" % ms, "ms")
     save_stat(pool_size, n, eps, ms)
+
+    # writing result to file
+    result_file_name = RES + "RES %d %d %d.txt" % (pool_size, n, log10(eps))
+    with open(result_file_name, "w") as result_file:
+        print("X =", est, file=result_file)
+
+        # correction report
+        check = np.zeros(n)
+        for i in range(n):
+            check[i] = a[i*n:i*n+n].dot(est)
+        print("AR =", check, file=result_file)  # actual result
+        print("ER = ", b, file=result_file)  # expected result
+
+        diff = np.absolute(check - b)
+        print("DIFF =", diff, file=result_file)  # differences
+        print("MAX DIFF =", max(diff), file=result_file) # max difference
 
 
 MPI.Finalize()

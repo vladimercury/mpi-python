@@ -5,9 +5,9 @@ import time
 
 # FOR WINDOWS
 executable = "mpiexec -n %d python jacobi.py A%s.txt B%s.txt %.0e"
-cores = (1, 2)
-matrix_sizes = (300, 800, 2000)
-accuracies = (1e-3, 1e-6, 1e-9)
+cores = (1, 2,)
+matrix_sizes = (300,)
+accuracies = (1e-3,)
 
 
 DEVNULL = open(os.devnull, "w")
