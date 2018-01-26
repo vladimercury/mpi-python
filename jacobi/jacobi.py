@@ -1,7 +1,7 @@
 from mpi4py import MPI
-import util
 import numpy as np
 from math import log10
+import util
 
 
 ROOT = "../data/"

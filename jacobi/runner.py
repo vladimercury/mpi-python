@@ -5,8 +5,10 @@ import time
 
 # FOR WINDOWS
 executable = "mpiexec -n %d python jacobi.py A%s.txt B%s.txt %.0e"
+if os.name == "posix":
+    executable = "mpirun -n %d python3 jacobi.py A%s.txt B%s.txt %.0e"
 cores = (1, 2,)
-matrix_sizes = (300,)
+matrix_sizes = (8,)
 accuracies = (1e-3,)
 
 
